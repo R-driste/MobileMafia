@@ -1,9 +1,10 @@
+from player import Player
 import badge
+
 #three screens, host, game dets, lobby
 class App(badge.BaseApp):
     def on_open(self) -> None:
         self.personal_player = Player(badge.contacts.my_contact().name)
-
         self.screens = ["host", "dets", "lobby"]
         self.last_time = badge.time.monotonic()
         self.current_screen = "host"
@@ -71,7 +72,7 @@ class App(badge.BaseApp):
             badge.display.nice_text("Something went wrong with your role!", 0, 0, font=32, color=0)
 
         badge.display.nice_text("Game Details", 0, 0, font=32, color=0)
-        badge.display.nice_text(f"Role: {}", 0, 0, font=32, color=0)
+        badge.display.nice_text(f"Role: {self.personal_player.role}", 0, 0, font=32, color=0)
         badge.display.nice_text("Player Statuses:", 0, 64, font=24, color=0)
         y_offset = 100
         for player in self.active_players:
@@ -84,26 +85,15 @@ class App(badge.BaseApp):
             badge.display.nice_text("Waiting for\nhost to start\nthe game...", 0, 0, font=32, color=0)
         else:
             badge.display.nice_text(f"Game in\nprogress, currently in {self.stage}", 0, 0, font=32, color=0)
-
+            if self.stage == "night":
+                badge.display.nice_text("Night phase, please wait...", 0, 64, font=24, color=0)
+            elif self.stage == "day":
+        
         badge.display.nice_text("")
 
     def loop(self) -> None:
         pass
 
 #for host to track people
-class Player():
-    def __init__(self, name: str):
-        self.name = name
-        self.role = "unassigned"
-        self.alive = True
-        self.id = 0
-    def __repr__(self):
-        return f"{self.name} ({self.role}) - {'Alive' if self.alive else 'Dead'}"
-    def assign_role(self, role: str):
-        self.role = role
-    #kraken functions
-    def kill(self, player):
-        if self.role == "Kraken":
-            player.alive = False
-    
+
         

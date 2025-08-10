@@ -1,6 +1,6 @@
 # MobileMafia
 Play mafia with an extra twist, using hack club's badges as control panels for the characters.
-
+Using documentation from here: https://github.com/mpkendall/shipwrecked-pcb/wiki/App-API-reference
 
 # Roles
 ## Villager Team

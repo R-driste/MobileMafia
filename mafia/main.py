@@ -88,11 +88,66 @@ class App(badge.BaseApp):
             if self.stage == "night":
                 badge.display.nice_text("Night phase, please wait...", 0, 64, font=24, color=0)
             elif self.stage == "day":
-        
+                badge.display.nice_text("Daytime phase, go socialize!", 0, 64, font=24, color=0)
+            elif self.stage == "voting":
+                badge.display.nice_text("Daytime phase, go socialize!", 0, 64, font=24, color=0)
         badge.display.nice_text("")
+
+    def cast_vote(self, voter_name: str, voted_name: str) -> None:
+        old_vote = self.votes.get(voter_name)
+        if old_vote:
+            self.vote_counts[old_vote] = self.vote_counts.get(old_vote, 1) - 1
+            if self.vote_counts[old_vote] <= 0:
+                del self.vote_counts[old_vote]
+
+        # Register new vote
+        self.votes[voter_name] = voted_name
+        self.vote_counts[voted_name] = self.vote_counts.get(voted_name, 0) + 1
+        self.logger.info(f"{voter_name} voted for {voted_name}")
+    
+    def render_vote_screen(self) -> None:
+        badge.display.fill(1)
+        badge.display.nice_text("Voting Phase", 0, 0, font=32, color=0)
+        if len(self.active_players) == 0:
+            badge.display.nice_text("No players to vote for.", 0, 64, font=24, color=0)
+            badge.display.show()
+            return
+
+        # Highlight currently selected player
+        selected = self.active_players[self.voting_player_index].name
+        badge.display.nice_text(f"Vote for:", 0, 50, font=24, color=0)
+        badge.display.nice_text(selected, 0, 80, font=32, color=0)
+        badge.display.nice_text("Use Left/Right to select", 0, 130, font=18, color=0)
+        badge.display.nice_text("Press B to vote", 0, 150, font=18, color=0)
+        badge.display.show()
+
+
 
     def loop(self) -> None:
         pass
+        if badge.input.get_button("BTN_A") and not self.is_voting:
+            self.is_voting = True
+            self.voting_player_index = 0
+            self.render_vote_screen()
+            time.sleep(0.3)
+
+        if self.is_voting:
+            if badge.input.get_button("BTN_LEFT"):
+                self.voting_player_index = (self.voting_player_index - 1) % len(self.active_players)
+                self.render_vote_screen()
+                time.sleep(0.2)
+
+            elif badge.input.get_button("BTN_RIGHT"):
+                self.voting_player_index = (self.voting_player_index + 1) % len(self.active_players)
+                self.render_vote_screen()
+                time.sleep(0.2)
+
+            elif badge.input.get_button("BTN_B"):
+                voted_player = self.active_players[self.voting_player_index]
+                self.cast_vote(self.personal_player.name, voted_player.name)
+                self.is_voting = False
+                self.render_screen()
+                time.sleep(0.3)
 
 #for host to track people
 

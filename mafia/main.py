@@ -7,7 +7,7 @@ class App(badge.BaseApp):
         self.personal_player = Player(badge.contacts.my_contact().name)
         self.screens = ["host", "dets", "lobby"]
         self.last_time = badge.time.monotonic()
-        self.current_screen = 0  # Changed to index-based
+        self.current_screen = "host"
         self.active_players = []
         self.stage = "unstarted"
         self.stages = ["waiting", "night", "day", "voting"]
@@ -18,105 +18,12 @@ class App(badge.BaseApp):
 
     def render_screen(self) -> None:
         badge.display.fill(1)
-        # Call the correct render method based on current_screen index
-        if self.current_screen == 0:
-            self.render_host()
-        elif self.current_screen == 1:
-            self.render_dets()
-        elif self.current_screen == 2:
-            self.render_lobby()
+        self.screens[self.current_screen]() #calls correct render
         badge.display.show()
-
-    # Button handlers according to Shipwrecked PCB App API
-    def on_button_press(self, button: badge.Button) -> None:
-        """Handle button presses for navigation and game actions"""
-        if button == badge.Button.SW3:  # Home button
-            self.on_home_press()
-        elif button == badge.Button.SW12:  # Right button
-            self.on_right_press()
-        elif button == badge.Button.SW4:  # Select button
-            self.on_select_press()
-
-    def on_home_press(self) -> None:
-        """SW3 - Home button: Return to main menu or start new game"""
-        if self.current_screen != 0:
-            self.current_screen = 0
-            self.stage = "unstarted"
-            self.active_players = []
-            self.logger.info("Returned to home screen")
-        else:
-            # If already on home, start hosting a new game
-            self.start_hosting()
-
-    def on_right_press(self) -> None:
-        """SW12 - Right button: Navigate to next screen or next action"""
-        if self.current_screen < len(self.screens) - 1:
-            self.current_screen += 1
-            self.logger.info(f"Navigated to screen {self.current_screen}")
-        else:
-            # Wrap around to first screen
-            self.current_screen = 0
-            self.logger.info("Wrapped to first screen")
-
-    def on_select_press(self) -> None:
-        """SW4 - Select button: Confirm action or select option"""
-        if self.current_screen == 0:  # Host screen
-            if self.stage == "unstarted":
-                self.start_game()
-            else:
-                self.pause_game()
-        elif self.current_screen == 1:  # Details screen
-            self.refresh_game_details()
-        elif self.current_screen == 2:  # Lobby screen
-            self.ready_up()
-
-    def start_hosting(self) -> None:
-        """Start hosting a new game"""
-        self.stage = "waiting"
-        self.active_players = [self.personal_player]  # Add self to active players
-        self.logger.info("Started hosting new game")
-
-    def start_game(self) -> None:
-        """Start the game when host presses select"""
-        if len(self.active_players) >= 3:  # Minimum players to start
-            self.stage = "night"
-            self.assign_roles()
-            self.logger.info("Game started!")
-        else:
-            self.logger.info("Need at least 3 players to start")
-
-    def pause_game(self) -> None:
-        """Pause the current game"""
-        if self.stage != "unstarted":
-            self.stage = "paused"
-            self.logger.info("Game paused")
-
-    def refresh_game_details(self) -> None:
-        """Refresh game details when on details screen"""
-        self.logger.info("Refreshed game details")
-
-    def ready_up(self) -> None:
-        """Mark player as ready in lobby"""
-        if self.stage == "waiting":
-            self.logger.info("Player marked as ready")
-
-    def assign_roles(self) -> None:
-        """Assign roles to players at game start"""
-        import random
-        roles = ["Kraken", "Kraken", "Villager", "Villager", "cop"]
-        random.shuffle(roles)
-        
-        for i, player in enumerate(self.active_players):
-            if i < len(roles):
-                player.assign_role(roles[i])
-            else:
-                player.assign_role("Villager")
-        
-        self.logger.info("Roles assigned to players")
 
     #main welcome screen
     def on_packet(self, packet: badge.radio.Packet, in_foreground: bool) -> None:
-        if packet.app_number != 0:  # Fixed: Use actual app number from manifest
+        if packet.app_number != YOUR_APP_NUMBER:
             return
         try:
             data_str = packet.data.decode("utf-8")
@@ -131,73 +38,59 @@ class App(badge.BaseApp):
         except Exception as e:
             self.logger.error(f"Error decoding packet: {e}")
 
-    def handle_join_request(self, name: str, source) -> None:
-        """Handle join request from another player"""
-        new_player = Player(name)
-        new_player.id = source
-        self.add_player(new_player)
-        # Send join acknowledgment
-        ack_data = f"JOIN_ACK:{name}".encode("utf-8")
-        badge.radio.send(ack_data, destination=source)
-
-    def handle_join_ack(self, data: str) -> None:
-        """Handle join acknowledgment"""
-        self.logger.info(f"Join acknowledged: {data}")
-
     def render_welcome(self) -> None:
-        badge.display.nice_text("Welcome to\nMafia!", 0, 0, font=32, color=0)
-        badge.display.nice_text("Press Home to\nstart hosting", 0, 64, font=24, color=0)
-        badge.display.nice_text("Press Right to\nnavigate", 0, 88, font=24, color=0)
+        badge.display.nice_text("Welcome to\nKraken!", 0, 0, font=32, color=0)
+        badge.display.nice_text("Press Top Left to\nstart a game", 0, 64, font=24, color=0)
+        badge.display.nice_text("Press Top Right to\join a game", 0, 64, font=24, color=0)
 
     #host screen
     def render_host(self) -> None:
-        badge.display.nice_text("Hosting Game!", 0, 0, font=32, color=0)
-        badge.display.nice_text(f"Players: {len(self.active_players)}", 0, 32, font=24, color=0)
-        badge.display.nice_text("Press Select to start", 0, 64, font=24, color=0)
-        badge.display.nice_text("Press Right for details", 0, 88, font=24, color=0)
-        
-        y_offset = 120
+        badge.display.nice_text("Hosting Game ###!", 0, 0, font=32, color=0)
+        badge.display.nice_text(f"# Players Joined: {len(self.active_players)}", 0, 64, font=24, color=0)
+        badge.display.nice_text("LIST", 0, 64, font=24, color=0)
+        y_offset = 50
         for player in self.active_players:
-            badge.display.nice_text(f"• {player.name}", 0, y_offset, font=16, color=0)
-            y_offset += 20
+            badge.display.nice_text(player.name, 0, y_offset, font=24, color=0)
 
     #get players to join
     def render_join(self) -> None:
-        badge.display.nice_text("Welcome to\nMafia!", 0, 0, font=32, color=0)
-        badge.display.nice_text("Press Home to\nstart hosting", 0, 64, font=24, color=0)
+        badge.display.nice_text("Welcome to\nKraken!", 0, 0, font=32, color=0)
+        badge.display.nice_text("Press Top Left to\nstart a game", 0, 64, font=24, color=0)
     
     #render game details
     def render_dets(self) -> None:
-        badge.display.nice_text("Game Details", 0, 0, font=32, color=0)
-        
         if self.personal_player.role == "unassigned":
-            badge.display.nice_text("Role: Not assigned", 0, 32, font=24, color=0)
+            badge.display.nice_text("Error. You have not\nbeen assigned\na role yet.", 0, 0, font=32, color=0)
+        elif self.personal_player.role == "Kraken":
+            badge.display.nice_text("You are a\nKraken member!", 0, 0, font=32, color=0)
+        elif self.personal_player.role == "Villager":
+            badge.display.nice_text("You are a\nVillager!", 0, 0, font=32, color=0)
+        elif self.personal_player.role == "cop":
+            badge.display.nice_text("You are a\nCop!", 0, 0, font=32, color=0)
         else:
-            badge.display.nice_text(f"Role: {self.personal_player.role}", 0, 32, font=24, color=0)
-        
-        badge.display.nice_text(f"Stage: {self.stage}", 0, 56, font=24, color=0)
-        badge.display.nice_text(f"Players: {len(self.active_players)}", 0, 80, font=24, color=0)
-        badge.display.nice_text("Press Right for lobby", 0, 104, font=24, color=0)
+            badge.display.nice_text("Something went wrong with your role!", 0, 0, font=32, color=0)
+
+        badge.display.nice_text("Game Details", 0, 0, font=32, color=0)
+        badge.display.nice_text(f"Role: {self.personal_player.role}", 0, 0, font=32, color=0)
+        badge.display.nice_text("Player Statuses:", 0, 64, font=24, color=0)
+        y_offset = 100
+        for player in self.active_players:
+            badge.display.nice_text(player.name, 0, y_offset, font=24, color=0)
+            y_offset += 24
 
     #get game lobby
     def render_lobby(self) -> None:
         if self.stage == "unstarted":
             badge.display.nice_text("Waiting for\nhost to start\nthe game...", 0, 0, font=32, color=0)
-        elif self.stage == "waiting":
-            badge.display.nice_text("Waiting for\nplayers to\njoin...", 0, 0, font=32, color=0)
-        elif self.stage == "night":
-            badge.display.nice_text("Night phase", 0, 0, font=32, color=0)
-            badge.display.nice_text("Please wait...", 0, 32, font=24, color=0)
-        elif self.stage == "day":
-            badge.display.nice_text("Day phase", 0, 0, font=32, color=0)
-            badge.display.nice_text("Discuss and vote!", 0, 32, font=24, color=0)
-        elif self.stage == "voting":
-            badge.display.nice_text("Voting phase", 0, 0, font=32, color=0)
-            badge.display.nice_text("Choose who to eliminate", 0, 32, font=24, color=0)
         else:
-            badge.display.nice_text(f"Game status:\n{self.stage}", 0, 0, font=32, color=0)
-        
-        badge.display.nice_text("Press Home to return", 0, 64, font=24, color=0)
+            badge.display.nice_text(f"Game in\nprogress, currently in {self.stage}", 0, 0, font=32, color=0)
+            if self.stage == "night":
+                badge.display.nice_text("Night phase, please wait...", 0, 64, font=24, color=0)
+            elif self.stage == "day":
+                badge.display.nice_text("Daytime phase, go socialize!", 0, 64, font=24, color=0)
+            elif self.stage == "voting":
+                badge.display.nice_text("Daytime phase, go socialize!", 0, 64, font=24, color=0)
+        badge.display.nice_text("")
 
     def cast_vote(self, voter_name: str, voted_name: str) -> None:
         old_vote = self.votes.get(voter_name)
@@ -230,15 +123,28 @@ class App(badge.BaseApp):
 
 
     def loop(self) -> None:
-        """Main game loop - called every frame"""
-        current_time = badge.time.monotonic()
-        
-        # Update game state based on time if needed
-        if current_time - self.last_time > 1.0:  # Every second
-            self.last_time = current_time
-            # Add any periodic game logic here
-        
-        # Render the current screen
-        self.render_screen()
+        pass
+        if badge.input.get_button("BTN_A") and not self.is_voting:
+            self.is_voting = True
+            self.voting_player_index = 0
+            self.render_vote_screen()
+            time.sleep(0.3)
 
+        if self.is_voting:
+            if badge.input.get_button("BTN_LEFT"):
+                self.voting_player_index = (self.voting_player_index - 1) % len(self.active_players)
+                self.render_vote_screen()
+                time.sleep(0.2)
+
+            elif badge.input.get_button("BTN_RIGHT"):
+                self.voting_player_index = (self.voting_player_index + 1) % len(self.active_players)
+                self.render_vote_screen()
+                time.sleep(0.2)
+
+            elif badge.input.get_button("BTN_B"):
+                voted_player = self.active_players[self.voting_player_index]
+                self.cast_vote(self.personal_player.name, voted_player.name)
+                self.is_voting = False
+                self.render_screen()
+                time.sleep(0.3)
         

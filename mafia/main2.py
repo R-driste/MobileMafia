@@ -1,4 +1,127 @@
-from player import Player
+class Player():
+    def __init__(self, name: str):
+        self.name = name
+        self.role = "unassigned"
+        self.alive = True
+        self.id = 0
+        self.vote_target = None  # Who this player voted for
+        self.votes_received = 0  # How many votes this player received
+        self.has_voted = False   # Whether this player has voted this round
+        
+    def __repr__(self):
+        return f"{self.name} ({self.role}) - {'Alive' if self.alive else 'Dead'}"
+        
+    def assign_role(self, role: str):
+        self.role = role
+        
+    #kraken functions
+    def kill(self, player):
+        if self.role == "Kraken":
+            player.alive = False
+    
+    # Voting functions
+    def vote(self, target_player):
+        """Vote for a player to eliminate"""
+        if self.alive and not self.has_voted:
+            self.vote_target = target_player
+            self.has_voted = True
+            return True
+        return False
+    
+    def clear_vote(self):
+        """Clear the player's vote for the next round"""
+        self.vote_target = None
+        self.has_voted = False
+        self.votes_received = 0
+    
+    def receive_vote(self):
+        """Increment vote count when someone votes for this player"""
+        self.votes_received += 1
+    
+    def get_vote_info(self):
+        """Get current voting information for this player"""
+        return {
+            "name": self.name,
+            "alive": self.alive,
+            "role": self.role,
+            "votes_received": self.votes_received,
+            "has_voted": self.has_voted,
+            "vote_target": self.vote_target.name if self.vote_target else None
+        }
+
+class VotingResults:
+    """Class to track and display voting results"""
+    def __init__(self):
+        self.votes = {}  # player_name -> vote_target_name
+        self.vote_counts = {}  
+        self.total_votes_cast = 0
+        self.round_number = 0
+        
+    def add_vote(self, voter_name: str, target_name: str):
+        """Record a vote from voter to target"""
+        self.votes[voter_name] = target_name
+        self.total_votes_cast += 1
+        
+        # Update vote count for target
+        if target_name in self.vote_counts:
+            self.vote_counts[target_name] += 1
+        else:
+            self.vote_counts[target_name] = 1
+    
+    def get_vote_summary(self):
+        """Get a summary of all votes cast"""
+        return {
+            "total_votes": self.total_votes_cast,
+            "vote_breakdown": self.vote_counts.copy(),
+            "round": self.round_number
+        }
+    
+    def get_elimination_candidate(self):
+        """Get the player with the most votes (to be eliminated)"""
+        if not self.vote_counts:
+            return None
+            
+        max_votes = max(self.vote_counts.values())
+        candidates = [name for name, votes in self.vote_counts.items() if votes == max_votes]
+        
+        if len(candidates) == 1:
+            return candidates[0]  # Clear winner
+        else:
+            return candidates  # Tie - return list of tied players
+    
+    def display_results(self):
+        """Format voting results for display"""
+        if not self.vote_counts:
+            return "No votes cast yet"
+            
+        result_lines = [f"Voting Results (Round {self.round_number})"]
+        result_lines.append(f"Total votes: {self.total_votes_cast}")
+        result_lines.append("")
+        
+        # Sort by vote count (highest first)
+        sorted_votes = sorted(self.vote_counts.items(), key=lambda x: x[1], reverse=True)
+        
+        for player_name, vote_count in sorted_votes:
+            result_lines.append(f"{player_name}: {vote_count} votes")
+        
+        # Show elimination candidate
+        candidate = self.get_elimination_candidate()
+        if isinstance(candidate, list):
+            result_lines.append(f"\nTIE: {', '.join(candidate)}")
+        elif candidate:
+            result_lines.append(f"\nEliminated: {candidate}")
+            
+        return "\n".join(result_lines)
+    
+    def reset_round(self):
+        """Reset for a new voting round"""
+        self.votes.clear()
+        self.vote_counts.clear()
+        self.total_votes_cast = 0
+        self.round_number += 1
+
+#MAIN
+
 import badge
 
 #three screens, host, game dets, lobby
@@ -145,7 +268,7 @@ class App(badge.BaseApp):
         self.logger.info(f"Join acknowledged: {data}")
 
     def render_welcome(self) -> None:
-        badge.display.nice_text("Welcome to\nMafia!", 0, 0, font=32, color=0)
+        badge.display.nice_text("Welcome to\nMafia!", 0, 0, font=24, color=0)
         badge.display.nice_text("Press Home to\nstart hosting", 0, 64, font=24, color=0)
         badge.display.nice_text("Press Right to\nnavigate", 0, 88, font=24, color=0)
 
@@ -153,8 +276,8 @@ class App(badge.BaseApp):
     def render_host(self) -> None:
         badge.display.nice_text("Hosting Game!", 0, 0, font=32, color=0)
         badge.display.nice_text(f"Players: {len(self.active_players)}", 0, 32, font=24, color=0)
-        badge.display.nice_text("Press Select to start", 0, 64, font=24, color=0)
-        badge.display.nice_text("Press Right for details", 0, 88, font=24, color=0)
+        badge.display.nice_text("Press SW4 to start", 0, 64, font=18, color=0)
+        badge.display.nice_text("Press SW11 for details", 0, 88, font=18, color=0)
         
         y_offset = 120
         for player in self.active_players:
@@ -164,7 +287,7 @@ class App(badge.BaseApp):
     #get players to join
     def render_join(self) -> None:
         badge.display.nice_text("Welcome to\nMafia!", 0, 0, font=32, color=0)
-        badge.display.nice_text("Press Home to\nstart hosting", 0, 64, font=24, color=0)
+        badge.display.nice_text("Press SW4 to\nstart hosting", 0, 64, font=24, color=0)
     
     #render game details
     def render_dets(self) -> None:
@@ -199,36 +322,6 @@ class App(badge.BaseApp):
         
         badge.display.nice_text("Press Home to return", 0, 64, font=24, color=0)
 
-    def cast_vote(self, voter_name: str, voted_name: str) -> None:
-        old_vote = self.votes.get(voter_name)
-        if old_vote:
-            self.vote_counts[old_vote] = self.vote_counts.get(old_vote, 1) - 1
-            if self.vote_counts[old_vote] <= 0:
-                del self.vote_counts[old_vote]
-
-        # Register new vote
-        self.votes[voter_name] = voted_name
-        self.vote_counts[voted_name] = self.vote_counts.get(voted_name, 0) + 1
-        self.logger.info(f"{voter_name} voted for {voted_name}")
-    
-    def render_vote_screen(self) -> None:
-        badge.display.fill(1)
-        badge.display.nice_text("Voting Phase", 0, 0, font=32, color=0)
-        if len(self.active_players) == 0:
-            badge.display.nice_text("No players to vote for.", 0, 64, font=24, color=0)
-            badge.display.show()
-            return
-
-        # Highlight currently selected player
-        selected = self.active_players[self.voting_player_index].name
-        badge.display.nice_text(f"Vote for:", 0, 50, font=24, color=0)
-        badge.display.nice_text(selected, 0, 80, font=32, color=0)
-        badge.display.nice_text("Use Left/Right to select", 0, 130, font=18, color=0)
-        badge.display.nice_text("Press B to vote", 0, 150, font=18, color=0)
-        badge.display.show()
-
-
-
     def loop(self) -> None:
         """Main game loop - called every frame"""
         current_time = badge.time.monotonic()
@@ -238,7 +331,12 @@ class App(badge.BaseApp):
             self.last_time = current_time
             # Add any periodic game logic here
         
-        # Render the current screen
-        self.render_screen()
+        # Render the current screen. Should only happen if update.
+        if badge.input.get_button(badge.input.Buttons.SW4):
+            self.on_select_press()
+        if badge.input.get_button(badge.input.Buttons.SW11):
+            self.render_dets()
+        else:
+            self.render_screen()
 
         

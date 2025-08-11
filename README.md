@@ -10,3 +10,14 @@ Hack Club Organizer : You are one of the organizers. Every night, you can pick a
 
 ## Monster team
 Kraken : You are the monster disguised as a villager. Every night, you can pull a villager into the ocean with you. You win if all the villager teams are gone.
+
+PHASE 1:
+Welcome Screen
+mafia -> host, join
+
+PHASE 2:
+Host -> Shows who has joined the game
+
+SW3 Home
+SW12 Right
+SW4 Select

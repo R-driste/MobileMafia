@@ -38,7 +38,6 @@ class App(badge.BaseApp):
         except Exception as e:
             self.logger.error(f"Error decoding packet: {e}")
 
-
     def render_welcome(self) -> None:
         badge.display.nice_text("Welcome to\nKraken!", 0, 0, font=32, color=0)
         badge.display.nice_text("Press Top Left to\nstart a game", 0, 64, font=24, color=0)
@@ -148,7 +147,4 @@ class App(badge.BaseApp):
                 self.is_voting = False
                 self.render_screen()
                 time.sleep(0.3)
-
-#for host to track people
-
         
